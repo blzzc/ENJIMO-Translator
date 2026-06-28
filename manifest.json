@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "ENJIMO Translate",
+  "short_name": "ENJIMO",
+  "version": "0.1.0",
+  "description": "极简可调的本地中英翻译悬浮框，使用 Chrome 内置模型在设备端完成翻译。",
+  "minimum_chrome_version": "138",
+  "permissions": ["storage", "contextMenus", "activeTab"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "打开 ENJIMO Translate" },
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": ["content.js"],
+    "run_at": "document_idle",
+    "all_frames": false
+  }]
+}
