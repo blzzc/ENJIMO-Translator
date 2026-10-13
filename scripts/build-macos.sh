@@ -17,6 +17,6 @@ cp Resources/Info.plist "$APP/Contents/Info.plist"
 swift "$ROOT/scripts/make-icon.swift" "$APP/Contents/Resources/AppIcon.icns"
 codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict "$APP"
-lipo -verify_arch arm64 x86_64 "$APP/Contents/MacOS/Enjimo"
+lipo "$APP/Contents/MacOS/Enjimo" -verify_arch arm64 x86_64
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$ROOT/dist/ENJIMO-macOS-universal.zip"
 echo "已构建：$APP"
