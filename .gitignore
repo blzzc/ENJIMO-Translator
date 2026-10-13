@@ -1,0 +1,4 @@
+macos/.build/
+dist/
+.DS_Store
+*.dSYM/

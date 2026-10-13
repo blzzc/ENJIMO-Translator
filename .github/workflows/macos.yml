@@ -1,0 +1,83 @@
+name: Build ENJIMO for macOS
+on:
+  push:
+    branches: [main]
+    paths: ['macos/**', 'scripts/**', '.github/workflows/macos.yml']
+  pull_request:
+    paths: ['macos/**', 'scripts/**', '.github/workflows/macos.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit and Japanese OCR tests
+        working-directory: macos
+        run: swift test
+      - name: Build universal app (Apple Silicon + Intel)
+        run: bash scripts/build-macos.sh
+      - name: Launch packaged app
+        run: |
+          dist/ENJIMO.app/Contents/MacOS/Enjimo --smoke-test > /tmp/enjimo-smoke.log 2>&1 &
+          APP_PID=$!
+          for attempt in {1..30}; do
+            if ! kill -0 "$APP_PID" 2>/dev/null; then break; fi
+            sleep 1
+          done
+          if kill -0 "$APP_PID" 2>/dev/null; then
+            kill "$APP_PID"
+            cat /tmp/enjimo-smoke.log
+            exit 1
+          fi
+          wait "$APP_PID"
+          cat /tmp/enjimo-smoke.log
+          grep -q ENJIMO_SMOKE_OK /tmp/enjimo-smoke.log
+      - name: Package drag-to-install DMG
+        run: bash scripts/package-dmg.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ENJIMO-macOS-universal
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+      - name: Record release version
+        id: version
+        run: echo "tag=v$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' macos/Resources/Info.plist)" >> "$GITHUB_OUTPUT"
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+
+  release:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ENJIMO-macOS-universal
+          path: dist
+      - name: Publish tested version (never replace an existing release)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; bump Info.plist to publish a new version."
+            exit 0
+          fi
+          gh release create "$TAG" dist/*.dmg dist/*.zip dist/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" --title "ENJIMO $TAG · macOS 截图日语翻译" \
+            --notes-file macos/RELEASE-NOTES.md
