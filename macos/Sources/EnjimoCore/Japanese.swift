@@ -17,7 +17,7 @@ public enum Japanese {
             kCFAllocatorDefault, text as CFString,
             CFRange(location: 0, length: source.length),
             kCFStringTokenizerUnitWord | kCFStringTokenizerAttributeLatinTranscription,
-            CFLocaleCreate(kCFAllocatorDefault, "ja_JP" as CFString)
+            NSLocale(localeIdentifier: "ja_JP") as CFLocale
         )!
         var output = ""
         var cursor = 0
@@ -30,8 +30,8 @@ public enum Japanese {
                 tokenizer, kCFStringTokenizerAttributeLatinTranscription
             ) as? String
             // Kana still has a useful fallback; unknown kanji stays visible rather than inventing a reading.
-            let fallback = original.applyingTransform(.hiraganaToKatakana, reverse: true)?
-                .applyingTransform(.toLatin, reverse: false) ?? original
+            let kana = original.applyingTransform(StringTransform.hiraganaToKatakana, reverse: true) ?? original
+            let fallback = kana.applyingTransform(StringTransform.toLatin, reverse: false) ?? original
             let hasKanji = original.unicodeScalars.contains { (0x3400...0x9FFF).contains($0.value) }
             let token = reading ?? (hasKanji ? original : fallback)
             if gap.isEmpty, !output.isEmpty { output += " " }
